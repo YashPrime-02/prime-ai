@@ -1,59 +1,61 @@
 /**
- * Commander is used for building CLI commands
+ * =====================================================
+ * PRIME AI MAIN APPLICATION
+ * =====================================================
  *
- * Example:
- * prime-ai
- * prime-ai chat
- * prime-ai help
+ * This is the brain of Prime AI.
+ *
+ * Responsibilities:
+ *
+ * - Configure Commander
+ * - Register Commands
+ * - Start Wakeup Screen
+ * - Start Future AI Features
+ *
+ * =====================================================
  */
+
 
 import { Command } from "commander";
 
 /**
- * Chalk is used for terminal colors
+ * Import Wakeup Module
+ *
+ * This keeps startup UI separate
+ * from application logic.
  */
-import chalk from "chalk";
+import { wakeup } from "./wakeup.js";
 
 /**
- * Create commander application
+ * Create Commander App
  */
 const program = new Command();
 
 /**
- * Basic information
+ * Basic CLI Information
  */
-
-program.name("prime-ai").description("Prime AI CLI Assistant").version("1.0.0");
+program
+.name("prime-ai")
+.description("Prime AI CLI Assistant")
+.version("1.0.0");
 
 /**
- * Default action
+ * Default Command
  *
- * Runs when user simply types:
+ * Runs when:
  *
  * prime-ai
  */
 
 program.action(() => {
-  console.log("");
-
-  console.log(chalk.cyan("🚀 Welcome to Prime AI"));
-
-  console.log(chalk.green("Your Personal AI Assistant"));
-
-  console.log("");
-
-  console.log(chalk.yellow("Version: 1.0.0"));
-
-  console.log("");
+  wakeup();
 });
 
-/**
- * Parse terminal arguments
- *
- * VERY IMPORTANT
- *
- * Without this,
- * Commander won't work.
- */
 
+
+/**
+ * Parse CLI Arguments
+ *
+ * Required by Commander.
+ */
 program.parse();

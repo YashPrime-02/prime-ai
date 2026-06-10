@@ -1,17 +1,29 @@
 #!/usr/bin/env node
 
 /**
- * PRIME AI ENTRY FILE
+ * =====================================================
+ * PRIME AI ENTRY POINT
+ * =====================================================
  *
- * This file is executed when user runs:
+ * This file is executed whenever user runs:
  *
  * prime-ai
  *
- * The shebang above tells operating systems:
- * "Run this file using Node.js"
+ * Keep this file extremely small.
+ *
+ * Its only job:
+ * Start the application.
+ *
+ * Similar to:
+ *
+ * main()
+ *
+ * in other programming languages.
+ *
+ * =====================================================
  */
 
 /**
- * Import our main application
+ * Start Prime AI
  */
 import "../src/index.js";
