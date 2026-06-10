@@ -22,6 +22,7 @@ const program = new Command();
 /**
  * Basic information
  */
+
 program.name("prime-ai").description("Prime AI CLI Assistant").version("1.0.0");
 
 /**
@@ -31,6 +32,7 @@ program.name("prime-ai").description("Prime AI CLI Assistant").version("1.0.0");
  *
  * prime-ai
  */
+
 program.action(() => {
   console.log("");
 
@@ -53,4 +55,5 @@ program.action(() => {
  * Without this,
  * Commander won't work.
  */
+
 program.parse();
