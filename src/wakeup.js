@@ -5,31 +5,41 @@
  *
  * PURPOSE
  * -------
- * This file controls everything that appears when
- * Prime AI starts.
+ * Responsible for displaying the startup screen.
  *
- * Think of it as:
+ * Think of this file as:
  *
  * "Prime AI is waking up..."
  *
- * Later we can add:
- * - Clack intro screens
- * - Loading spinners
- * - Startup animations
- * - AI status checks
- * - Memory loading
+ * Features:
+ *
+ * - ASCII Banner
+ * - Banner Shadow Effect
+ * - Version Information
+ * - Available Commands
+ * - Startup Status
+ * - Startup Mode Selection
+ *
+ * Future Additions:
+ *
+ * - Loading Animations
+ * - Memory Loading
+ * - User Profiles
+ * - AI Health Checks
+ * - Startup Diagnostics
  *
  * ==========================================================
  */
 
-
 import chalk from "chalk";
+import figlet from "figlet";
+import { select, isCancel } from "@clack/prompts";
+import { runCliMode } from "./modes/cli.js";
 
 /**
- * Application Information
- *
- * Keeping values here makes them easy
- * to update later.
+ * ==========================================================
+ * APPLICATION CONFIGURATION
+ * ==========================================================
  */
 
 const APP_NAME = "PRIME AI";
@@ -37,38 +47,132 @@ const APP_VERSION = "1.0.0";
 const APP_TAGLINE = "Your Personal AI Assistant";
 
 /**
- * UI Constants
+ * Banner Font
+ *
+ * Figlet converts text into ASCII art.
  */
-const DIVIDER = "══════════════════════════════════════════════════════";
+const BANNER_FONT = "ANSI Shadow";
 
+/**
+ * Theme Colors
+ *
+ * SHADOW = Banner shadow layer
+ * FACE   = Main banner layer
+ */
+const SHADOW = chalk.hex("#5b4d9e");
+const FACE = chalk.hex("#8dcdf8").bold;
+
+/**
+ * Available Commands
+ *
+ * Displayed on startup.
+ */
 const COMMANDS = ["prime-ai chat", "prime-ai help", "prime-ai memory"];
 
 /**
- * Display startup screen
+ * Divider Line
  */
-export function wakeup() {
+const DIVIDER = "══════════════════════════════════════════════════════";
+
+/**
+ * ==========================================================
+ * PRINT ASCII BANNER WITH SHADOW
+ * ==========================================================
+ *
+ * Creates a pseudo 3D effect by printing:
+ *
+ * 1. Shadow Layer
+ * 2. Face Layer
+ *
+ * ==========================================================
+ */
+function printBannerWithShadow(ascii) {
   /**
-   * Add some breathing room
+   * Split banner into individual lines
+   */
+  const bannerLines = ascii.replace(/\s+$/, "").split("\n");
+
+  /**
+   * Find longest line
+   *
+   * Used for alignment.
+   */
+  const maxLength = Math.max(...bannerLines.map((line) => line.length), 0);
+
+  const rowWidth = maxLength + 2;
+
+  /**
+   * Print Shadow Layer
+   */
+  for (const line of bannerLines) {
+    console.log(SHADOW((" " + line).padEnd(rowWidth)));
+  }
+
+  /**
+   * Move cursor upward
+   *
+   * ANSI Escape Code:
+   *
+   * \x1b = Escape Character
+   * [nA  = Move cursor up n lines
+   */
+  process.stdout.write(`\x1b[${bannerLines.length}A`);
+
+  /**
+   * Print Main Banner Layer
+   */
+  for (const line of bannerLines) {
+    console.log(FACE(line.padEnd(rowWidth)));
+  }
+
+  console.log("");
+}
+
+/**
+ * ==========================================================
+ * WAKEUP FUNCTION
+ * ==========================================================
+ *
+ * Main startup sequence.
+ *
+ * ==========================================================
+ */
+export async function wakeup() {
+  /**
+   * Clear terminal
    */
   console.clear();
 
-  /**
-   * Top Divider
-   */
-  console.log(chalk.blueBright(DIVIDER));
+  let ascii;
 
   /**
-   * Main Logo
+   * Generate ASCII Banner
    */
-  console.log(chalk.cyanBright.bold(`🤖 ${APP_NAME}`));
+  try {
+    ascii = figlet.textSync(APP_NAME, {
+      font: BANNER_FONT,
+    });
+  } catch {
+    /**
+     * Fallback Font
+     */
+    ascii = figlet.textSync(APP_NAME, {
+      font: "Standard",
+    });
+  }
+
+  /**
+   * Render Banner
+   */
+  printBannerWithShadow(ascii);
 
   /**
    * Tagline
    */
-  console.log(chalk.white(APP_TAGLINE));
+  console.log(chalk.whiteBright(APP_TAGLINE));
 
   /**
-   * Bottom Divider
+   * Divider
    */
   console.log(chalk.blueBright(DIVIDER));
 
@@ -100,4 +204,94 @@ export function wakeup() {
   console.log(chalk.gray("Ready to assist. Type a command to continue."));
 
   console.log("");
+
+  /**
+   * ========================================================
+   * MODE SELECTION
+   * ========================================================
+   *
+   * Ask the user how Prime AI
+   * should run.
+   *
+   * ========================================================
+   */
+  const mode = await select({
+    message: "Which mode would you like to start?",
+    options: [
+      {
+        value: "cli",
+        label: "CLI Mode",
+        hint: "Run inside terminal",
+      },
+      {
+        value: "telegram",
+        label: "Telegram Mode",
+        hint: "Connect with Telegram",
+      },
+    ],
+  });
+
+  /**
+   * ========================================================
+   * HANDLE CANCELLATION
+   * ========================================================
+   *
+   * User may:
+   *
+   * - Press ESC
+   * - Press CTRL + C
+   *
+   * ========================================================
+   */
+  if (isCancel(mode)) {
+    console.log("");
+
+    console.log(chalk.yellow("Prime AI startup cancelled."));
+
+    console.log("");
+
+    return;
+  }
+
+  /**
+   * ========================================================
+   * MODE ROUTING
+   * ========================================================
+   *
+   * Route user to selected mode.
+   *
+   * ========================================================
+   */
+
+  /**
+   * CLI MODE
+   */
+  if (mode === "cli") {
+    console.log("");
+
+    console.log(chalk.green("✓ CLI mode selected"));
+
+    console.log(chalk.dim("Launching terminal assistant..."));
+
+    console.log("");
+
+    await runCliMode();
+
+    return;
+  }
+
+  /**
+   * TELEGRAM MODE
+   */
+  if (mode === "telegram") {
+    console.log("");
+
+    console.log(chalk.green("✓ Telegram mode selected"));
+
+    console.log(chalk.dim("Preparing Telegram integration..."));
+
+    console.log("");
+
+    return;
+  }
 }
