@@ -20,6 +20,11 @@ import { select, isCancel } from "@clack/prompts";
 import chalk from "chalk";
 
 /**
+ * Agent Mode
+ */
+import { runAgentMode } from "./agent/orchestrator.js";
+
+/**
  * =====================================================
  * RUN CLI MODE
  * =====================================================
@@ -58,16 +63,43 @@ export async function runCliMode() {
     });
 
     /**
-     * User pressed ESC
-     * or selected Back.
+     * =================================================
+     * EXIT CLI MODE
+     * =================================================
+     *
+     * User either:
+     *
+     * - Pressed ESC
+     * - Pressed CTRL + C
+     * - Selected Back
+     *
+     * =================================================
      */
     if (isCancel(mode) || mode === "back") {
+      console.log("");
+
+      console.log(chalk.dim("Leaving CLI mode..."));
+
+      console.log("");
+
       return;
     }
 
     /**
      * =================================================
      * AGENT MODE
+     * =================================================
+     *
+     * The Agent acts as the intelligent
+     * project orchestrator.
+     *
+     * Responsibilities:
+     *
+     * - Understand goals
+     * - Analyze requirements
+     * - Generate plans
+     * - Coordinate tools
+     *
      * =================================================
      */
     if (mode === "agent") {
@@ -77,6 +109,8 @@ export async function runCliMode() {
 
       console.log("");
 
+      await runAgentMode();
+
       continue;
     }
 
@@ -84,11 +118,19 @@ export async function runCliMode() {
      * =================================================
      * PLAN MODE
      * =================================================
+     *
+     * Future:
+     *
+     * Generate structured execution plans.
+     *
+     * =================================================
      */
     if (mode === "plan") {
       console.log("");
 
       console.log(chalk.green("Starting Plan Mode..."));
+
+      console.log(chalk.dim("Plan Mode is under development."));
 
       console.log("");
 
@@ -99,11 +141,19 @@ export async function runCliMode() {
      * =================================================
      * ASK MODE
      * =================================================
+     *
+     * Future:
+     *
+     * Direct AI conversations.
+     *
+     * =================================================
      */
     if (mode === "ask") {
       console.log("");
 
       console.log(chalk.green("Starting Ask Mode..."));
+
+      console.log(chalk.dim("Ask Mode is under development."));
 
       console.log("");
 
