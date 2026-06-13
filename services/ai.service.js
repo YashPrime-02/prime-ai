@@ -46,14 +46,55 @@ import { AI_CONFIG } from "../config/ai.config.js";
  *
  * =====================================================
  */
+/**
+ * =====================================================
+ * GENERATE AI RESPONSE
+ * =====================================================
+ *
+ * Sends a prompt to the configured
+ * AI provider and returns the response.
+ *
+ * =====================================================
+ */
 
 export async function generateResponse(prompt) {
   try {
     /**
-     * Send request to Ollama
+     * Debug Information
+     */
+    // console.log("\n========== AI DEBUG ==========");
+
+    // console.log("Provider :", AI_CONFIG.provider);
+
+    // console.log("Model    :", AI_CONFIG.model);
+
+    // console.log("Base URL :", AI_CONFIG.baseUrl);
+
+    // console.log("Node     :", process.version);
+
+    // console.log("==============================\n");
+
+    /**
+     * Create Request Timeout
+     *
+     * Prevents hanging forever if
+     * Ollama does not respond.
+     */
+    const controller = new AbortController();
+
+    const timeout = setTimeout(() => {
+      controller.abort();
+    }, 15000);
+
+    console.log("Sending request to Ollama...");
+
+    /**
+     * Send Request
      */
     const response = await fetch(`${AI_CONFIG.baseUrl}/api/generate`, {
       method: "POST",
+
+      signal: controller.signal,
 
       headers: {
         "Content-Type": "application/json",
@@ -66,24 +107,49 @@ export async function generateResponse(prompt) {
       }),
     });
 
+    clearTimeout(timeout);
+
+    console.log("✓ Request completed");
+
     /**
-     * Handle server errors
+     * Handle HTTP Errors
      */
     if (!response.ok) {
       throw new Error(`AI request failed with status ${response.status}`);
     }
 
+    console.log("Waiting for JSON response...");
+
     /**
-     * Parse response
+     * Parse Response
      */
     const data = await response.json();
 
+    console.log("✓ JSON received");
+
     /**
-     * Return generated text
+     * Basic Response Validation
+     */
+    if (!data.response) {
+      throw new Error("Ollama returned an empty response.");
+    }
+
+    console.log("✓ AI response generated");
+
+    /**
+     * Return Generated Text
      */
     return data.response;
   } catch (error) {
-    console.error("Prime AI Service Error:", error.message);
+    console.log("");
+
+    console.error("========== AI ERROR ==========");
+
+    console.error(error);
+
+    console.error("==============================");
+
+    console.log("");
 
     return "Unable to contact AI service.";
   }

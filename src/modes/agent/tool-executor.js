@@ -27,7 +27,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-
+import chalk from "chalk";
 import { homedir } from "node:os";
 
 import { spawnSync } from "node:child_process";
@@ -235,6 +235,155 @@ export class ToolExecutor {
       return undefined;
     }
 
+    return fs.readFileSync(absolutePath, "utf8");
+  }
+
+  /**
+   * ===================================================
+   * FIND FILE BY NAME
+   * ===================================================
+   *
+   * Allows the agent to locate files
+   * anywhere inside the workspace.
+   *
+   * Examples:
+   *
+   * index.js
+   * package.json
+   * orchestrator.js
+   *
+   * ===================================================
+   */
+  findFileByName(fileName, currentDir) {
+    const entries = fs.readdirSync(currentDir, {
+      withFileTypes: true,
+    });
+
+    for (const entry of entries) {
+      const fullPath = path.join(currentDir, entry.name);
+
+      /**
+       * Skip large folders
+       */
+      if (
+        entry.isDirectory() &&
+        ["node_modules", ".git", "dist", "build"].includes(entry.name)
+      ) {
+        continue;
+      }
+
+      if (entry.isDirectory()) {
+        const found = this.findFileByName(fileName, fullPath);
+
+        if (found) {
+          return found;
+        }
+
+        continue;
+      }
+
+      if (entry.name.toLowerCase() === fileName.toLowerCase()) {
+  console.log(
+    chalk.cyan("🔍 Located"),
+    chalk.whiteBright(fileName),
+    chalk.gray("→"),
+    chalk.magenta(fullPath),
+  );
+
+  return fullPath;
+}
+    }
+
+    return null;
+  }
+
+  /**
+   * ===================================================
+   * READ FILE
+   * ===================================================
+   *
+   * PURPOSE
+   * -------
+   * Reads a text file from the workspace.
+   *
+   * Used by:
+   *
+   * - Agent explanations
+   * - Code analysis
+   * - Future AI tool calls
+   *
+   * ===================================================
+   */
+  async readFile(relPath) {
+    /**
+     * Ensure path is allowed
+     */
+    this.assertNotExcluded(relPath, "read_file");
+
+    /**
+     * Try direct path first
+     */
+    let absolutePath = this.resolveSafe(relPath);
+
+    /**
+     * If the direct path does not
+     * exist, search the workspace.
+     */
+    if (!fs.existsSync(absolutePath)) {
+      const discovered = this.findFileByName(
+        path.basename(relPath),
+        this.config.codebasePath,
+      );
+
+      if (!discovered) {
+        throw new Error(
+  `File not found in workspace: ${relPath}`,
+);
+      }
+
+      absolutePath = discovered;
+    }
+
+    /**
+     * Must be a file
+     */
+    const stats = fs.statSync(absolutePath);
+
+    if (!stats.isFile()) {
+      throw new Error(`Not a file: ${relPath}`);
+    }
+
+    /**
+     * File size protection
+     */
+    if (stats.size > this.config.maxFileSizeToRead) {
+      throw new Error(`File exceeds maximum size limit: ${relPath}`);
+    }
+
+    /**
+     * Text files only
+     */
+    if (!isProbablyTextFile(absolutePath)) {
+      throw new Error(`Unsupported file type: ${relPath}`);
+    }
+
+    /**
+     * Check staged content first
+     */
+    const effectiveText = this.getEffectiveText(relPath);
+
+    if (typeof effectiveText === "string") {
+      return effectiveText;
+    }
+
+    console.log(
+  chalk.green("✓ Reading"),
+  chalk.magenta(absolutePath),
+);
+
+    /**
+     * Read from disk
+     */
     return fs.readFileSync(absolutePath, "utf8");
   }
 }

@@ -11,22 +11,11 @@
  * Responsibilities:
  *
  * - Accept user goals
- * - Prepare agent context
- * - Initialize tools
- * - Initialize action tracking
- * - Coordinate future AI execution
- *
- * Think of it as:
- *
- * User Goal
- *      ↓
- * Orchestrator
- *      ↓
- * Agent
- *      ↓
- * Tools
- *      ↓
- * Approval
+ * - Initialize agent systems
+ * - Load tools
+ * - Connect AI provider
+ * - Read project files
+ * - Coordinate future workflows
  *
  * =====================================================
  */
@@ -45,15 +34,36 @@ import { createAgentTools } from "./agent-tools.js";
 
 import { runApprovalFlow } from "./approval-flow.js";
 
+import { generateResponse } from "../../../services/ai.service.js";
+
+/**
+ * =====================================================
+ * EXTRACT FILE NAME
+ * =====================================================
+ *
+ * Detects file references inside
+ * user requests.
+ *
+ * Examples:
+ *
+ * explain index.js
+ * review package.json
+ * tell me about app.jsx
+ *
+ * =====================================================
+ */
+function extractFileName(goal) {
+  const match = goal.match(/\b[\w.-]+\.(js|jsx|ts|tsx|json|md|css|html)\b/i);
+
+  return match?.[0] ?? null;
+}
+
 /**
  * =====================================================
  * RUN AGENT MODE
  * =====================================================
- *
- * Entry point for Agent Mode.
- *
- * =====================================================
  */
+
 export async function runAgentMode() {
   console.log("");
 
@@ -62,7 +72,7 @@ export async function runAgentMode() {
   console.log("");
 
   /**
-   * Ask user for goal.
+   * Ask user for goal
    */
   const goal = await text({
     message: "What would you like the agent to do?",
@@ -71,7 +81,7 @@ export async function runAgentMode() {
   });
 
   /**
-   * User cancelled.
+   * User cancelled
    */
   if (isCancel(goal) || !goal?.trim()) {
     console.log("");
@@ -85,7 +95,7 @@ export async function runAgentMode() {
 
   /**
    * ===================================================
-   * AGENT INITIALIZATION
+   * INITIALIZE AGENT SYSTEMS
    * ===================================================
    */
 
@@ -98,9 +108,7 @@ export async function runAgentMode() {
   const tools = createAgentTools(executor);
 
   /**
-   * Context Object
-   *
-   * Will be expanded later.
+   * Agent Context
    */
   const agentContext = {
     goal: goal.trim(),
@@ -140,29 +148,156 @@ export async function runAgentMode() {
 
   /**
    * ===================================================
-   * NEXT PHASE
-   * ===================================================
-   *
-   * Tomorrow:
-   *
-   * - Connect AI SDK
-   * - Connect Ollama
-   * - Tool Calling
-   * - Multi-Step Reasoning
-   * - Approval Workflow
-   *
+   * AI REASONING
    * ===================================================
    */
-  console.log(chalk.cyan("Agent reasoning system coming next..."));
+
+  console.log(chalk.cyan("Thinking..."));
 
   console.log("");
 
+  try {
+    /**
+     * Default Prompt
+     */
+    let prompt = goal.trim();
+
+    /**
+     * Detect file reference
+     */
+    const fileName = extractFileName(goal);
+
+    /**
+     * File-aware mode
+     */
+    if (fileName) {
+      console.log(chalk.cyan(`Reading file: ${fileName}`));
+
+      console.log("");
+
+      try {
+        /**
+         * Read file contents
+         */
+        const fileContent = await executor.readFile(fileName);
+
+        /**
+         * Debug Information
+         *
+         * Remove later once verified.
+         */
+        console.log(chalk.yellow(`File Length: ${fileContent.length}`));
+
+        console.log("");
+
+        console.log(chalk.dim(fileContent.slice(0, 500)));
+
+        console.log("");
+
+        /**
+         * Build AI prompt using
+         * actual file contents.
+         */
+        prompt = `
+You are a senior software engineer.
+
+The user asked:
+
+"${goal}"
+
+Below is the actual file content.
+
+========================================
+${fileContent}
+========================================
+
+Explain:
+
+1. What this file does
+2. Important imports
+3. Important functions
+4. Key logic
+5. How the file fits into the project
+6. Potential improvements
+
+Use beginner-friendly language.
+`;
+      } catch (fileError) {
+        console.log("");
+
+        console.log(chalk.red(`FILE READ ERROR: ${fileError.message}`));
+
+        console.log("");
+
+        prompt = `
+The user asked about:
+
+"${fileName}"
+
+However the file could not be found.
+
+Respond that the file was not found.
+`;
+      }
+    }
+
+    /**
+     * Send prompt to AI
+     */
+    const response = await generateResponse(prompt);
+
+    if (response?.trim()) {
+      console.log(chalk.white(response));
+
+      console.log("");
+    }
+  } catch (error) {
+    console.log(chalk.red("Failed to generate AI response."));
+
+    console.log(chalk.dim(error.message));
+
+    console.log("");
+
+    return;
+  }
+
   /**
-   * Temporary Approval Test
+   * ===================================================
+   * APPROVAL FLOW
+   * ===================================================
    *
-   * Remove later.
+   * Currently there are no
+   * generated mutations yet.
+   *
+   * This remains here because
+   * future ToolLoopAgent work
+   * will generate actions that
+   * require approval.
+   *
+   * ===================================================
    */
-  await runApprovalFlow(tracker);
+
+  const approved = await runApprovalFlow(tracker);
+
+  if (!approved) {
+    console.log("");
+
+    console.log(chalk.dim("No approved actions."));
+
+    console.log("");
+
+    return agentContext;
+  }
+
+  /**
+   * Future:
+   *
+   * executor.applyApprovedFromTracker()
+   */
+
+  console.log(chalk.green("✓ Approved actions detected"));
+
+  console.log("");
 
   return agentContext;
 }

@@ -11,6 +11,7 @@
  *
  * Responsibilities:
  *
+ * - Load Environment Variables
  * - Configure Commander
  * - Register CLI Commands
  * - Launch the Wakeup Screen
@@ -20,6 +21,28 @@
  *
  * =====================================================
  */
+
+/**
+ * =====================================================
+ * LOAD ENVIRONMENT VARIABLES
+ * =====================================================
+ *
+ * Loads values from:
+ *
+ * .env
+ *
+ * Example:
+ *
+ * AI_PROVIDER=ollama
+ * OLLAMA_MODEL=qwen2.5:1.5b
+ * OLLAMA_BASE_URL=http://localhost:11434
+ *
+ * Must be loaded before importing
+ * configuration-dependent modules.
+ *
+ * =====================================================
+ */
+import "dotenv/config";
 
 import { Command } from "commander";
 
@@ -61,13 +84,6 @@ const program = new Command();
  * =====================================================
  * APPLICATION METADATA
  * =====================================================
- *
- * Displayed when users run:
- *
- * prime-ai --help
- * prime-ai --version
- *
- * =====================================================
  */
 program.name("prime-ai").description("Prime AI CLI Assistant").version("1.0.0");
 
@@ -76,12 +92,9 @@ program.name("prime-ai").description("Prime AI CLI Assistant").version("1.0.0");
  * DEFAULT APPLICATION ACTION
  * =====================================================
  *
- * Runs when the user executes:
+ * Runs when:
  *
  * prime-ai
- *
- * Since no command was supplied,
- * we launch the Prime AI startup flow.
  *
  * =====================================================
  */
@@ -94,15 +107,9 @@ program.action(async () => {
  * WAKEUP COMMAND
  * =====================================================
  *
- * Runs when the user executes:
+ * Runs when:
  *
  * prime-ai wakeup
- *
- * This command exists mainly for:
- *
- * - Testing
- * - Development
- * - Direct Startup Access
  *
  * =====================================================
  */
@@ -117,15 +124,6 @@ program
  * =====================================================
  * PARSE COMMAND-LINE ARGUMENTS
  * =====================================================
- *
- * Commander reads the user input and
- * determines which command should run.
- *
- * Examples:
- *
- * prime-ai
- * prime-ai wakeup
- * prime-ai --help
  *
  * Without parse(), Commander will not
  * execute any commands.
