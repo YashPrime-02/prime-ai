@@ -1,6 +1,6 @@
 # PRIME AI
 
-> Local-First AI Coding Assistant powered by Ollama, Qwen, Node.js, and Agent Workflows.
+> A Local-First AI Coding Assistant powered by Ollama, Qwen, Node.js, and Agent Workflows.
 
 ---
 
