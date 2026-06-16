@@ -69,7 +69,14 @@ function detectIntent(goal) {
     return "modify";
   }
 
-  if (text.includes("create file") || text.includes("new file")) {
+  if (
+    text.includes("create") ||
+    text.includes("build") ||
+    text.includes("generate") ||
+    text.includes("make") ||
+    text.includes("new file") ||
+    text.includes("create file")
+  ) {
     return "create";
   }
 
@@ -177,34 +184,44 @@ export async function runAgentMode() {
 
     const intent = detectIntent(goal);
 
+    let targetFile = fileName;
+
+    if (!targetFile && intent === "create") {
+      const lower = goal.toLowerCase();
+
+      if (
+        lower.includes("landing page") ||
+        lower.includes("website") ||
+        lower.includes("portfolio")
+      ) {
+        targetFile = "index.html";
+      } else if (lower.includes("server")) {
+        targetFile = "server.js";
+      } else {
+        targetFile = "generated-file.txt";
+      }
+    }
+
     console.log("");
     console.log(chalk.yellow("========== DEBUG =========="));
-    console.log("Goal     :", goal);
-    console.log("Intent   :", intent);
-    console.log("FileName :", fileName);
+    console.log("Goal       :", goal);
+    console.log("Intent     :", intent);
+    console.log("FileName   :", fileName);
+    console.log("TargetFile :", targetFile);
     console.log("===========================");
     console.log("");
 
     /**
-     * =================================================
+     * ===============================================
      * EXPLAIN FILE
-     * =================================================
+     * ===============================================
      */
-
     if (fileName && intent === "explain") {
       console.log(chalk.cyan("📖 Reading file:"), chalk.whiteBright(fileName));
 
       console.log("");
 
       const fileContent = await executor.readFile(fileName);
-
-      console.log(chalk.yellow(`File Length: ${fileContent.length}`));
-
-      console.log("");
-
-      console.log(chalk.dim(fileContent.slice(0, 500)));
-
-      console.log("");
 
       prompt = `
 You are a senior software engineer.
@@ -231,6 +248,12 @@ Explain:
 Use beginner-friendly language.
 `;
     } else if (fileName && intent === "modify") {
+
+    /**
+     * ===============================================
+     * MODIFY FILE
+     * ===============================================
+     */
       console.log(
         chalk.yellow("✏️ Preparing modification:"),
         chalk.whiteBright(fileName),
@@ -255,22 +278,26 @@ ${fileContent}
 
 IMPORTANT:
 
-Return the COMPLETE updated file.
+Return ONLY the complete updated file.
 
-Do not explain anything.
+Do not explain.
 
 Do not use markdown.
 
 Do not use triple backticks.
 
-Do not summarize.
-
-Output must be the final file contents only.
+Return raw file contents only.
 `;
-    } else if (fileName && intent === "create") {
+    } else if (targetFile && intent === "create") {
+
+    /**
+     * ===============================================
+     * CREATE FILE
+     * ===============================================
+     */
       console.log(
         chalk.green("📄 Preparing file creation:"),
-        chalk.whiteBright(fileName),
+        chalk.whiteBright(targetFile),
       );
 
       console.log("");
@@ -294,11 +321,17 @@ Do not use markdown.
 
 Do not use triple backticks.
 
-Do not include any commentary.
+Do not include commentary.
 
 Output must be raw file content only.
 `;
     } else if (fileName && intent === "delete") {
+
+    /**
+     * ===============================================
+     * DELETE FILE
+     * ===============================================
+     */
       console.log("");
 
       console.log(
@@ -329,21 +362,21 @@ Output must be raw file content only.
     console.log("");
 
     /**
-     * =================================================
-     * STAGE FILE MODIFICATION
-     * =================================================
+     * ===============================================
+     * CREATE FILE
+     * ===============================================
      */
-    if (intent === "create" && fileName && response?.trim()) {
+    if (intent === "create" && targetFile && response?.trim()) {
       const fileContent = cleanAiFileResponse(response);
 
       console.log("");
       console.log(chalk.cyan("CREATE DEBUG"));
-      console.log("intent   =", intent);
-      console.log("fileName =", fileName);
-      console.log("length   =", fileContent.length);
+      console.log("intent     =", intent);
+      console.log("targetFile =", targetFile);
+      console.log("length     =", fileContent.length);
       console.log("");
 
-      const result = await executor.createFile(fileName, fileContent);
+      const result = await executor.createFile(targetFile, fileContent);
 
       console.log("CREATE RESULT");
       console.log(result);
@@ -369,6 +402,12 @@ Output must be raw file content only.
 
       console.log("");
     } else if (intent === "modify" && fileName && response?.trim()) {
+
+    /**
+     * ===============================================
+     * MODIFY FILE
+     * ===============================================
+     */
       const updatedContent = cleanAiFileResponse(response);
 
       await executor.modifyFile(fileName, updatedContent);
@@ -389,6 +428,12 @@ Output must be raw file content only.
 
       console.log("");
     } else if (response?.trim()) {
+
+    /**
+     * ===============================================
+     * NORMAL RESPONSE
+     * ===============================================
+     */
       console.log(chalk.white(response));
 
       console.log("");
@@ -404,7 +449,6 @@ Output must be raw file content only.
 
     return;
   }
-
   /**
    * ===================================================
    * APPROVAL FLOW

@@ -37,6 +37,7 @@ let ready = false;
  *
  * =====================================================
  */
+
 function ensureMarked() {
   if (ready) {
     return;
@@ -73,6 +74,7 @@ function ensureMarked() {
  *
  * =====================================================
  */
+
 export function renderTerminalMarkdown(source) {
   ensureMarked();
 
