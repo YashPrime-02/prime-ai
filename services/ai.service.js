@@ -5,92 +5,84 @@
  *
  * PURPOSE
  * -------
- * Responsible for communicating with
- * AI providers.
+ * Central AI communication layer.
  *
- * Current Provider:
+ * All AI requests pass through here.
+ *
+ * Supported:
  * - Ollama
  *
- * Future Providers:
+ * Planned:
  * - OpenAI
  * - Claude
  * - Gemini
  *
- * IMPORTANT
- * ---------
- * All AI requests should go through
- * this file.
- *
- * This keeps the rest of the application
- * independent from any specific AI
- * provider.
- *
  * =====================================================
  */
 
+import chalk from "chalk";
 import { AI_CONFIG } from "../config/ai.config.js";
 
 /**
  * =====================================================
- * GENERATE AI RESPONSE
- * =====================================================
- *
- * Sends a prompt to the configured
- * AI provider and returns the response.
- *
- * Example:
- *
- * const reply = await generateResponse(
- *   "Explain JavaScript promises"
- * );
- *
+ * SYSTEM PROMPT
  * =====================================================
  */
+
+const SYSTEM_PROMPT = `
+You are Prime AI.
+
+You are a senior software engineer and AI coding assistant.
+
+Rules:
+
+- Be accurate.
+- Be concise.
+- Never invent file contents.
+- Never claim a file exists if it was not provided.
+- Prefer tool usage when available.
+- If modifying code, return only the final code.
+`;
+
 /**
  * =====================================================
- * GENERATE AI RESPONSE
- * =====================================================
- *
- * Sends a prompt to the configured
- * AI provider and returns the response.
- *
+ * VALIDATE CONFIG
  * =====================================================
  */
 
-export async function generateResponse(prompt) {
+function validateConfig() {
+  if (!AI_CONFIG.provider) {
+    throw new Error("Missing AI provider.");
+  }
+
+  if (!AI_CONFIG.baseUrl) {
+    throw new Error("Missing AI base URL.");
+  }
+
+  if (!AI_CONFIG.model) {
+    throw new Error("Missing AI model.");
+  }
+}
+
+/**
+ * =====================================================
+ * OLLAMA REQUEST
+ * =====================================================
+ */
+
+async function callOllama(prompt) {
+  const controller = new AbortController();
+
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, 30000);
+
   try {
-    /**
-     * Debug Information
-     */
-    // console.log("\n========== AI DEBUG ==========");
+    console.log("");
+    console.log(chalk.cyan("🤖 Sending request to Ollama..."));
 
-    // console.log("Provider :", AI_CONFIG.provider);
+    const started = Date.now();
 
-    // console.log("Model    :", AI_CONFIG.model);
-
-    // console.log("Base URL :", AI_CONFIG.baseUrl);
-
-    // console.log("Node     :", process.version);
-
-    // console.log("==============================\n");
-
-    /**
-     * Create Request Timeout
-     *
-     * Prevents hanging forever if
-     * Ollama does not respond.
-     */
-    const controller = new AbortController();
-
-    const timeout = setTimeout(() => {
-      controller.abort();
-    }, 15000);
-
-    console.log("Sending request to Ollama...");
-
-    /**
-     * Send Request
-     */
     const response = await fetch(`${AI_CONFIG.baseUrl}/api/generate`, {
       method: "POST",
 
@@ -102,55 +94,81 @@ export async function generateResponse(prompt) {
 
       body: JSON.stringify({
         model: AI_CONFIG.model,
-        prompt,
+
         stream: false,
+
+        options: {
+          temperature: 0.2,
+        },
+
+        prompt: `
+${SYSTEM_PROMPT}
+
+${prompt}
+`,
       }),
     });
 
-    clearTimeout(timeout);
+    const elapsed = Date.now() - started;
 
-    console.log("✓ Request completed");
+    console.log(
+      chalk.green(`✓ Request completed (${elapsed.toLocaleString()}ms)`),
+    );
 
-    /**
-     * Handle HTTP Errors
-     */
     if (!response.ok) {
-      throw new Error(`AI request failed with status ${response.status}`);
+      throw new Error(
+        `Ollama request failed (${response.status} ${response.statusText})`,
+      );
     }
 
-    console.log("Waiting for JSON response...");
+    console.log(chalk.cyan("⏳ Waiting for JSON response..."));
 
-    /**
-     * Parse Response
-     */
     const data = await response.json();
 
-    console.log("✓ JSON received");
+    console.log(chalk.green("✓ JSON received"));
 
-    /**
-     * Basic Response Validation
-     */
-    if (!data.response) {
+    const output = data?.response?.trim();
+
+    if (!output) {
       throw new Error("Ollama returned an empty response.");
     }
 
-    console.log("✓ AI response generated");
+    console.log(chalk.green("✓ AI response generated"));
 
-    /**
-     * Return Generated Text
-     */
-    return data.response;
+    return output;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/**
+ * =====================================================
+ * GENERATE RESPONSE
+ * =====================================================
+ */
+
+export async function generateResponse(prompt) {
+  try {
+    validateConfig();
+
+    switch (AI_CONFIG.provider.toLowerCase()) {
+      case "ollama":
+        return await callOllama(prompt);
+
+      default:
+        throw new Error(`Unsupported AI provider: ${AI_CONFIG.provider}`);
+    }
   } catch (error) {
     console.log("");
 
-    console.error("========== AI ERROR ==========");
+    console.log(chalk.red("========== AI ERROR =========="));
 
-    console.error(error);
+    console.log(chalk.red(error?.message ?? String(error)));
 
-    console.error("==============================");
+    console.log(chalk.red("=============================="));
 
     console.log("");
 
-    return "Unable to contact AI service.";
+    return `AI Error: ${error?.message ?? "Unknown error"}`;
   }
 }

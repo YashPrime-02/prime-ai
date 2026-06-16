@@ -283,15 +283,15 @@ export class ToolExecutor {
       }
 
       if (entry.name.toLowerCase() === fileName.toLowerCase()) {
-  console.log(
-    chalk.cyan("🔍 Located"),
-    chalk.whiteBright(fileName),
-    chalk.gray("→"),
-    chalk.magenta(fullPath),
-  );
+        console.log(
+          chalk.cyan("🔍 Located"),
+          chalk.whiteBright(fileName),
+          chalk.gray("→"),
+          chalk.magenta(fullPath),
+        );
 
-  return fullPath;
-}
+        return fullPath;
+      }
     }
 
     return null;
@@ -336,9 +336,7 @@ export class ToolExecutor {
       );
 
       if (!discovered) {
-        throw new Error(
-  `File not found in workspace: ${relPath}`,
-);
+        throw new Error(`File not found in workspace: ${relPath}`);
       }
 
       absolutePath = discovered;
@@ -376,14 +374,247 @@ export class ToolExecutor {
       return effectiveText;
     }
 
-    console.log(
-  chalk.green("✓ Reading"),
-  chalk.magenta(absolutePath),
-);
+    console.log(chalk.green("✓ Reading"), chalk.magenta(absolutePath));
 
     /**
      * Read from disk
      */
     return fs.readFileSync(absolutePath, "utf8");
   }
+
+
+  /**
+ * ===================================================
+ * CREATE FILE
+ * ===================================================
+ */
+async createFile(relPath, content) {
+  this.assertNotExcluded(relPath, "create_file");
+
+  const key = this.norm(relPath);
+
+  if (this.getEffectiveText(relPath) !== undefined) {
+    throw new Error(`File already exists: ${relPath}`);
+  }
+
+  this.overlay.set(key, content);
+
+  const action = this.tracker.log({
+    type: "file_create",
+    path: key,
+    status: "pending",
+    userApproved: false,
+
+    details: {
+      before: "",
+      after: content,
+    },
+  });
+
+  console.log(
+    chalk.green("✓ Staged file creation"),
+    chalk.magenta(key),
+  );
+
+  return {
+    success: true,
+    actionId: action.id,
+    path: key,
+  };
+}
+
+/**
+ * ===================================================
+ * MODIFY FILE
+ * ===================================================
+ */
+async modifyFile(relPath, content) {
+  this.assertNotExcluded(relPath, "modify_file");
+
+  const key = this.norm(relPath);
+
+  const before = this.getEffectiveText(relPath);
+
+  if (before === undefined) {
+    throw new Error(`File does not exist: ${relPath}`);
+  }
+
+  this.overlay.set(key, content);
+
+  const action = this.tracker.log({
+    type: "file_modify",
+    path: key,
+    status: "pending",
+    userApproved: false,
+
+    details: {
+      before,
+      after: content,
+    },
+  });
+
+  console.log(
+    chalk.yellow("✏️ Staged modification"),
+    chalk.magenta(key),
+  );
+
+  return {
+    success: true,
+    actionId: action.id,
+    path: key,
+  };
+}
+
+/**
+ * ===================================================
+ * DELETE FILE
+ * ===================================================
+ */
+async deleteFile(relPath) {
+  this.assertNotExcluded(relPath, "delete_file");
+
+  const key = this.norm(relPath);
+
+  const before = this.getEffectiveText(relPath);
+
+  if (before === undefined) {
+    throw new Error(`File does not exist: ${relPath}`);
+  }
+
+  this.deleted.add(key);
+
+  const action = this.tracker.log({
+    type: "file_delete",
+    path: key,
+    status: "pending",
+    userApproved: false,
+
+    details: {
+      before,
+      after: "",
+    },
+  });
+
+  console.log(
+    chalk.red("🗑 Staged deletion"),
+    chalk.magenta(key),
+  );
+
+  return {
+    success: true,
+    actionId: action.id,
+    path: key,
+  };
+}
+
+/**
+ * ===================================================
+ * CREATE FOLDER
+ * ===================================================
+ */
+async createFolder(relPath) {
+  this.assertNotExcluded(relPath, "create_folder");
+
+  const key = this.norm(relPath);
+
+  const action = this.tracker.log({
+    type: "folder_create",
+    path: key,
+    status: "pending",
+    userApproved: false,
+
+    details: {},
+  });
+
+  console.log(
+    chalk.blue("📁 Staged folder"),
+    chalk.magenta(key),
+  );
+
+  return {
+    success: true,
+    actionId: action.id,
+    path: key,
+  };
+}
+
+/**
+ * ===================================================
+ * APPLY APPROVED ACTIONS
+ * ===================================================
+ */
+async applyApprovedFromTracker() {
+  const approved = this.tracker
+    .getActions()
+    .filter((action) => action.status === "approved");
+
+  for (const action of approved) {
+    const absolutePath = this.resolveSafe(action.path);
+
+    switch (action.type) {
+      case "file_create":
+      case "file_modify": {
+        fs.mkdirSync(path.dirname(absolutePath), {
+          recursive: true,
+        });
+
+        fs.writeFileSync(
+          absolutePath,
+          action.details.after,
+          "utf8",
+        );
+
+        break;
+      }
+
+      case "file_delete": {
+        if (fs.existsSync(absolutePath)) {
+          fs.unlinkSync(absolutePath);
+        }
+
+        break;
+      }
+
+      case "folder_create": {
+        fs.mkdirSync(absolutePath, {
+          recursive: true,
+        });
+
+        break;
+      }
+
+      default:
+        break;
+    }
+
+    this.tracker.updateStatus(
+      action.id,
+      "executed",
+      true,
+    );
+  }
+
+  this.overlay.clear();
+
+  this.deleted.clear();
+
+  console.log("");
+
+  console.log(
+    chalk.green.bold("✓ Approved actions applied"),
+  );
+
+  console.log("");
+}
+
+/**
+ * ===================================================
+ * CLEAR STAGING
+ * ===================================================
+ */
+clearStaging() {
+  this.overlay.clear();
+
+  this.deleted.clear();
+}
 }

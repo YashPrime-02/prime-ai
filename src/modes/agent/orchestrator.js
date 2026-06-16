@@ -15,7 +15,8 @@
  * - Load tools
  * - Connect AI provider
  * - Read project files
- * - Coordinate future workflows
+ * - Stage modifications
+ * - Coordinate approval flow
  *
  * =====================================================
  */
@@ -40,22 +41,60 @@ import { generateResponse } from "../../../services/ai.service.js";
  * =====================================================
  * EXTRACT FILE NAME
  * =====================================================
+ */
+function extractFileName(goal) {
+  const match = goal.match(
+    /\b[\w.-]+\.(js|jsx|ts|tsx|json|md|css|html|yml|yaml|txt)\b/i,
+  );
+
+  return match?.[0] ?? null;
+}
+
+/**
+ * =====================================================
+ * DETECT INTENT
+ * =====================================================
+ */
+function detectIntent(goal) {
+  const text = goal.toLowerCase();
+
+  if (
+    text.includes("modify") ||
+    text.includes("update") ||
+    text.includes("rewrite") ||
+    text.includes("replace") ||
+    text.includes("change") ||
+    text.includes("edit")
+  ) {
+    return "modify";
+  }
+
+  if (text.includes("create file") || text.includes("new file")) {
+    return "create";
+  }
+
+  if (text.includes("delete file") || text.includes("remove file")) {
+    return "delete";
+  }
+
+  return "explain";
+}
+
+/**
+ * =====================================================
+ * CLEAN AI FILE RESPONSE
+ * =====================================================
  *
- * Detects file references inside
- * user requests.
- *
- * Examples:
- *
- * explain index.js
- * review package.json
- * tell me about app.jsx
+ * Removes markdown fences that
+ * local models frequently return.
  *
  * =====================================================
  */
-function extractFileName(goal) {
-  const match = goal.match(/\b[\w.-]+\.(js|jsx|ts|tsx|json|md|css|html)\b/i);
-
-  return match?.[0] ?? null;
+function cleanAiFileResponse(text) {
+  return text
+    .replace(/^```[\w-]*\n?/i, "")
+    .replace(/\n?```$/i, "")
+    .trim();
 }
 
 /**
@@ -63,7 +102,6 @@ function extractFileName(goal) {
  * RUN AGENT MODE
  * =====================================================
  */
-
 export async function runAgentMode() {
   console.log("");
 
@@ -71,18 +109,11 @@ export async function runAgentMode() {
 
   console.log("");
 
-  /**
-   * Ask user for goal
-   */
   const goal = await text({
     message: "What would you like the agent to do?",
-
     placeholder: "Build a React portfolio website",
   });
 
-  /**
-   * User cancelled
-   */
   if (isCancel(goal) || !goal?.trim()) {
     console.log("");
 
@@ -107,20 +138,12 @@ export async function runAgentMode() {
 
   const tools = createAgentTools(executor);
 
-  /**
-   * Agent Context
-   */
   const agentContext = {
     goal: goal.trim(),
-
     config,
-
     tracker,
-
     executor,
-
     tools,
-
     createdAt: new Date(),
   };
 
@@ -137,75 +160,60 @@ export async function runAgentMode() {
   console.log("");
 
   console.log(chalk.green("✓ Agent initialized"));
-
   console.log(chalk.green("✓ Action tracker ready"));
-
   console.log(chalk.green("✓ Tool executor ready"));
-
   console.log(chalk.green("✓ Agent tools loaded"));
 
   console.log("");
-
-  /**
-   * ===================================================
-   * AI REASONING
-   * ===================================================
-   */
 
   console.log(chalk.cyan("Thinking..."));
 
   console.log("");
 
   try {
-    /**
-     * Default Prompt
-     */
     let prompt = goal.trim();
 
-    /**
-     * Detect file reference
-     */
     const fileName = extractFileName(goal);
 
+    const intent = detectIntent(goal);
+
+    console.log("");
+    console.log(chalk.yellow("========== DEBUG =========="));
+    console.log("Goal     :", goal);
+    console.log("Intent   :", intent);
+    console.log("FileName :", fileName);
+    console.log("===========================");
+    console.log("");
+
     /**
-     * File-aware mode
+     * =================================================
+     * EXPLAIN FILE
+     * =================================================
      */
-    if (fileName) {
-      console.log(chalk.cyan(`Reading file: ${fileName}`));
+
+    if (fileName && intent === "explain") {
+      console.log(chalk.cyan("📖 Reading file:"), chalk.whiteBright(fileName));
 
       console.log("");
 
-      try {
-        /**
-         * Read file contents
-         */
-        const fileContent = await executor.readFile(fileName);
+      const fileContent = await executor.readFile(fileName);
 
-        /**
-         * Debug Information
-         *
-         * Remove later once verified.
-         */
-        console.log(chalk.yellow(`File Length: ${fileContent.length}`));
+      console.log(chalk.yellow(`File Length: ${fileContent.length}`));
 
-        console.log("");
+      console.log("");
 
-        console.log(chalk.dim(fileContent.slice(0, 500)));
+      console.log(chalk.dim(fileContent.slice(0, 500)));
 
-        console.log("");
+      console.log("");
 
-        /**
-         * Build AI prompt using
-         * actual file contents.
-         */
-        prompt = `
+      prompt = `
 You are a senior software engineer.
 
 The user asked:
 
 "${goal}"
 
-Below is the actual file content.
+Below is the actual file.
 
 ========================================
 ${fileContent}
@@ -217,44 +225,180 @@ Explain:
 2. Important imports
 3. Important functions
 4. Key logic
-5. How the file fits into the project
+5. How it fits into the project
 6. Potential improvements
 
 Use beginner-friendly language.
 `;
-      } catch (fileError) {
-        console.log("");
+    } else if (fileName && intent === "modify") {
+      console.log(
+        chalk.yellow("✏️ Preparing modification:"),
+        chalk.whiteBright(fileName),
+      );
 
-        console.log(chalk.red(`FILE READ ERROR: ${fileError.message}`));
+      console.log("");
 
-        console.log("");
+      const fileContent = await executor.readFile(fileName);
 
-        prompt = `
-The user asked about:
+      prompt = `
+You are a senior software engineer.
 
-"${fileName}"
+The user requested:
 
-However the file could not be found.
+"${goal}"
 
-Respond that the file was not found.
+Current file:
+
+========================================
+${fileContent}
+========================================
+
+IMPORTANT:
+
+Return the COMPLETE updated file.
+
+Do not explain anything.
+
+Do not use markdown.
+
+Do not use triple backticks.
+
+Do not summarize.
+
+Output must be the final file contents only.
 `;
+    } else if (fileName && intent === "create") {
+      console.log(
+        chalk.green("📄 Preparing file creation:"),
+        chalk.whiteBright(fileName),
+      );
+
+      console.log("");
+
+      prompt = `
+You are a senior software engineer.
+
+The user requested:
+
+"${goal}"
+
+Create the requested file.
+
+IMPORTANT:
+
+Return ONLY the file contents.
+
+Do not explain.
+
+Do not use markdown.
+
+Do not use triple backticks.
+
+Do not include any commentary.
+
+Output must be raw file content only.
+`;
+    } else if (fileName && intent === "delete") {
+      console.log("");
+
+      console.log(
+        chalk.red("🗑 Staging deletion:"),
+        chalk.whiteBright(fileName),
+      );
+
+      console.log("");
+
+      await executor.deleteFile(fileName);
+
+      const approved = await runApprovalFlow(tracker);
+
+      if (approved) {
+        await executor.applyApprovedFromTracker();
       }
+
+      return agentContext;
     }
 
-    /**
-     * Send prompt to AI
-     */
     const response = await generateResponse(prompt);
 
-    if (response?.trim()) {
+    console.log("");
+    console.log(chalk.yellow("========== DEBUG =========="));
+    console.log("Response Exists :", !!response?.trim());
+    console.log("Response Length :", response?.length ?? 0);
+    console.log("===========================");
+    console.log("");
+
+    /**
+     * =================================================
+     * STAGE FILE MODIFICATION
+     * =================================================
+     */
+    if (intent === "create" && fileName && response?.trim()) {
+      const fileContent = cleanAiFileResponse(response);
+
+      console.log("");
+      console.log(chalk.cyan("CREATE DEBUG"));
+      console.log("intent   =", intent);
+      console.log("fileName =", fileName);
+      console.log("length   =", fileContent.length);
+      console.log("");
+
+      const result = await executor.createFile(fileName, fileContent);
+
+      console.log("CREATE RESULT");
+      console.log(result);
+
+      console.log("");
+      console.log("PENDING ACTIONS:", tracker.getPendingMutations().length);
+
+      console.log("ALL ACTIONS:", tracker.getActions().length);
+
+      console.log("");
+
+      console.log(chalk.green("✓ File creation staged"));
+
+      console.log(chalk.gray("Review and approve changes below."));
+
+      console.log("");
+
+      console.log(chalk.cyan("Preview (first 500 chars):"));
+
+      console.log("");
+
+      console.log(chalk.dim(fileContent.slice(0, 500)));
+
+      console.log("");
+    } else if (intent === "modify" && fileName && response?.trim()) {
+      const updatedContent = cleanAiFileResponse(response);
+
+      await executor.modifyFile(fileName, updatedContent);
+
+      console.log("");
+
+      console.log(chalk.green("✓ File modification staged"));
+
+      console.log(chalk.gray("Review and approve changes below."));
+
+      console.log("");
+
+      console.log(chalk.cyan("Preview (first 500 chars):"));
+
+      console.log("");
+
+      console.log(chalk.dim(updatedContent.slice(0, 500)));
+
+      console.log("");
+    } else if (response?.trim()) {
       console.log(chalk.white(response));
 
       console.log("");
     }
   } catch (error) {
+    console.log("");
+
     console.log(chalk.red("Failed to generate AI response."));
 
-    console.log(chalk.dim(error.message));
+    console.log(chalk.dim(error?.message ?? String(error)));
 
     console.log("");
 
@@ -265,17 +409,17 @@ Respond that the file was not found.
    * ===================================================
    * APPROVAL FLOW
    * ===================================================
-   *
-   * Currently there are no
-   * generated mutations yet.
-   *
-   * This remains here because
-   * future ToolLoopAgent work
-   * will generate actions that
-   * require approval.
-   *
-   * ===================================================
    */
+
+  console.log("");
+  console.log(chalk.yellow("========== TRACKER =========="));
+  console.log("Actions:", tracker.getActions().length);
+
+  console.log("Pending:", tracker.getPendingMutations().length);
+
+  console.log(tracker.getActions());
+  console.log("=============================");
+  console.log("");
 
   const approved = await runApprovalFlow(tracker);
 
@@ -289,15 +433,7 @@ Respond that the file was not found.
     return agentContext;
   }
 
-  /**
-   * Future:
-   *
-   * executor.applyApprovedFromTracker()
-   */
-
-  console.log(chalk.green("✓ Approved actions detected"));
-
-  console.log("");
+  await executor.applyApprovedFromTracker();
 
   return agentContext;
 }

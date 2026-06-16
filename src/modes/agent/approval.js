@@ -20,9 +20,7 @@
 
 import { select, isCancel } from "@clack/prompts";
 import chalk from "chalk";
-
 import { composeBeforeAfter, formatPatch } from "./diff-view.js";
-
 import { renderTerminalMarkdown } from "../../tui/terminal-md.js";
 
 /**
@@ -36,6 +34,7 @@ import { renderTerminalMarkdown } from "../../tui/terminal-md.js";
  *
  * =====================================================
  */
+
 function groupPending(pending) {
   const byPath = new Map();
 

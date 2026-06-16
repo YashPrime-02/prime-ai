@@ -13,6 +13,7 @@
  * - Which files can be accessed
  * - Which folders should be ignored
  * - Which tools are allowed
+ * - Agent execution limits
  *
  * =====================================================
  */
@@ -21,81 +22,118 @@
  * =====================================================
  * ACTION TYPES
  * =====================================================
- *
- * All actions that the agent can
- * perform inside a project.
- *
- * =====================================================
  */
-export const ACTION_TYPES = {
+export const ACTION_TYPES = Object.freeze({
   FILE_CREATE: "file_create",
   FILE_MODIFY: "file_modify",
   FILE_DELETE: "file_delete",
   FOLDER_CREATE: "folder_create",
+
   CODE_ANALYSIS: "code_analysis",
+
   TOOL_EXECUTE: "tool_execute",
-};
+
+  FILE_READ: "file_read",
+
+  FILE_SEARCH: "file_search",
+});
 
 /**
  * =====================================================
  * ACTION STATUS
  * =====================================================
- *
- * Tracks lifecycle of an action.
- *
- * =====================================================
  */
-export const ACTION_STATUS = {
+export const ACTION_STATUS = Object.freeze({
   PENDING: "pending",
+
   EXECUTED: "executed",
+
   APPROVED: "approved",
+
   REJECTED: "rejected",
-};
+});
 
 /**
  * =====================================================
  * DEFAULT AGENT CONFIG
  * =====================================================
- *
- * Returns default configuration.
- *
- * =====================================================
  */
 export function createAgentConfig() {
   return {
     /**
-     * Root project directory.
+     * Workspace Root
      */
     codebasePath: process.cwd(),
 
     /**
-     * Maximum file size to read.
+     * Maximum file size
+     * readable by the agent.
      *
      * 1 MB
      */
     maxFileSizeToRead: 1024 * 1024,
 
     /**
-     * Ignore patterns.
+     * Maximum files returned
+     * by searches.
+     */
+    maxSearchResults: 100,
+
+    /**
+     * Maximum recursive depth
+     * when scanning directories.
+     */
+    maxDirectoryDepth: 10,
+
+    /**
+     * Maximum tool calls
+     * during a single run.
+     */
+    maxToolCalls: 25,
+
+    /**
+     * Ignore Patterns
      */
     excludePatterns: [
       "node_modules",
       ".git",
+      ".next",
       "dist",
       "build",
-      ".next",
+
       "*.log",
+
       ".env*",
     ],
+
+    /**
+     * Files that should never
+     * be modified automatically.
+     */
+    protectedFiles: ["package-lock.json", "pnpm-lock.yaml", "yarn.lock"],
 
     /**
      * Tool Permissions
      */
     tools: {
       allowShellExecution: true,
+
       allowFileModification: true,
+
       allowFileCreation: true,
+
+      allowFileDeletion: true,
+
       allowFolderCreation: true,
+    },
+
+    /**
+     * AI Runtime
+     */
+    ai: {
+      maxSteps: 10,
+
+      temperature: 0.2,
     },
   };
 }
@@ -104,18 +142,13 @@ export function createAgentConfig() {
  * =====================================================
  * MUTATION CHECK
  * =====================================================
- *
- * Determines whether an action
- * changes the filesystem.
- *
- * =====================================================
  */
 export function isMutationType(type) {
-  return (
-    type === ACTION_TYPES.FILE_CREATE ||
-    type === ACTION_TYPES.FILE_MODIFY ||
-    type === ACTION_TYPES.FILE_DELETE ||
-    type === ACTION_TYPES.FOLDER_CREATE ||
-    type === ACTION_TYPES.TOOL_EXECUTE
-  );
+  return [
+    ACTION_TYPES.FILE_CREATE,
+    ACTION_TYPES.FILE_MODIFY,
+    ACTION_TYPES.FILE_DELETE,
+    ACTION_TYPES.FOLDER_CREATE,
+    ACTION_TYPES.TOOL_EXECUTE,
+  ].includes(type);
 }
