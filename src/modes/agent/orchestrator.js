@@ -301,7 +301,36 @@ Output must be the final file contents only.
 
       console.log("");
 
-     
+    prompt = `
+You are an expert software engineer.
+
+User request:
+
+"${goal}"
+
+Return files using EXACTLY this format:
+
+===FILE:index.html===
+<html>
+...
+</html>
+
+===FILE:styles.css===
+body {
+ ...
+}
+
+Rules:
+
+- No markdown
+- No explanations
+- No backticks
+- Output files only
+- Create all required files
+- If website/landing page/portfolio is requested,
+  ALWAYS create index.html and styles.css
+`;
+
     } else if (fileName && intent === "delete") {
       /**
        * ===============================================
@@ -352,14 +381,36 @@ Output must be the final file contents only.
       console.log("length     =", fileContent.length);
       console.log("");
 
-      const parsed = JSON.parse(fileContent);
+      const files = [];
 
-      for (const file of parsed.files) {
-        await executor.createFile(file.path, file.content);
+const matches = fileContent.matchAll(
+  /===FILE:(.*?)===([\s\S]*?)(?=(===FILE:|$))/g,
+);
 
-        console.log(chalk.green("✓ Staged:"), file.path);
-      }
+for (const match of matches) {
+  files.push({
+    path: match[1].trim(),
+    content: match[2].trim(),
+  });
+}
 
+if (!files.length) {
+  throw new Error(
+    "AI did not return any files",
+  );
+}
+
+for (const file of files) {
+  await executor.createFile(
+    file.path,
+    file.content,
+  );
+
+  console.log(
+    chalk.green("✓ Staged:"),
+    file.path,
+  );
+}
 
       console.log("");
       console.log("PENDING ACTIONS:", tracker.getPendingMutations().length);
@@ -378,7 +429,11 @@ Output must be the final file contents only.
 
       console.log("");
 
-      console.log(chalk.dim(fileContent.slice(0, 500)));
+      console.log(
+  chalk.dim(
+    files[0].content.slice(0, 500),
+  ),
+);
 
       console.log("");
     } else if (intent === "modify" && fileName && response?.trim()) {
