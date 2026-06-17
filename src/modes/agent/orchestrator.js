@@ -222,7 +222,6 @@ export async function runAgentMode() {
       console.log("");
 
       const fileContent = await executor.readFile(fileName);
-
       prompt = `
 You are a senior software engineer.
 
@@ -248,12 +247,11 @@ Explain:
 Use beginner-friendly language.
 `;
     } else if (fileName && intent === "modify") {
-
-    /**
-     * ===============================================
-     * MODIFY FILE
-     * ===============================================
-     */
+      /**
+       * ===============================================
+       * MODIFY FILE
+       * ===============================================
+       */
       console.log(
         chalk.yellow("✏️ Preparing modification:"),
         chalk.whiteBright(fileName),
@@ -278,23 +276,24 @@ ${fileContent}
 
 IMPORTANT:
 
-Return ONLY the complete updated file.
+Return the COMPLETE updated file.
 
-Do not explain.
+Do not explain anything.
 
 Do not use markdown.
 
 Do not use triple backticks.
 
-Return raw file contents only.
+Do not summarize.
+
+Output must be the final file contents only.
 `;
     } else if (targetFile && intent === "create") {
-
-    /**
-     * ===============================================
-     * CREATE FILE
-     * ===============================================
-     */
+      /**
+       * ===============================================
+       * CREATE FILE
+       * ===============================================
+       */
       console.log(
         chalk.green("📄 Preparing file creation:"),
         chalk.whiteBright(targetFile),
@@ -302,36 +301,13 @@ Return raw file contents only.
 
       console.log("");
 
-      prompt = `
-You are a senior software engineer.
-
-The user requested:
-
-"${goal}"
-
-Create the requested file.
-
-IMPORTANT:
-
-Return ONLY the file contents.
-
-Do not explain.
-
-Do not use markdown.
-
-Do not use triple backticks.
-
-Do not include commentary.
-
-Output must be raw file content only.
-`;
+     
     } else if (fileName && intent === "delete") {
-
-    /**
-     * ===============================================
-     * DELETE FILE
-     * ===============================================
-     */
+      /**
+       * ===============================================
+       * DELETE FILE
+       * ===============================================
+       */
       console.log("");
 
       console.log(
@@ -376,10 +352,14 @@ Output must be raw file content only.
       console.log("length     =", fileContent.length);
       console.log("");
 
-      const result = await executor.createFile(targetFile, fileContent);
+      const parsed = JSON.parse(fileContent);
 
-      console.log("CREATE RESULT");
-      console.log(result);
+      for (const file of parsed.files) {
+        await executor.createFile(file.path, file.content);
+
+        console.log(chalk.green("✓ Staged:"), file.path);
+      }
+
 
       console.log("");
       console.log("PENDING ACTIONS:", tracker.getPendingMutations().length);
@@ -402,12 +382,11 @@ Output must be raw file content only.
 
       console.log("");
     } else if (intent === "modify" && fileName && response?.trim()) {
-
-    /**
-     * ===============================================
-     * MODIFY FILE
-     * ===============================================
-     */
+      /**
+       * ===============================================
+       * MODIFY FILE
+       * ===============================================
+       */
       const updatedContent = cleanAiFileResponse(response);
 
       await executor.modifyFile(fileName, updatedContent);
@@ -428,12 +407,11 @@ Output must be raw file content only.
 
       console.log("");
     } else if (response?.trim()) {
-
-    /**
-     * ===============================================
-     * NORMAL RESPONSE
-     * ===============================================
-     */
+      /**
+       * ===============================================
+       * NORMAL RESPONSE
+       * ===============================================
+       */
       console.log(chalk.white(response));
 
       console.log("");
